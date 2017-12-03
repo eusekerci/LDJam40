@@ -16,43 +16,80 @@ public class SpiralGenerator : MonoBehaviour
     public bool IsCircleDistanceChange;
     public bool IsHalayorDistanceChange;
 
+    public bool IsHalayRunning;
+    public HalayorPool HalayorPool;
+    public bool InitRandom;
+
     private List<Transform> _halayorList;
     private float _halayStartParamChangeRate;
     private float _halayMagicNumChangeRate;
     private float _halayorDistanceChangeRate;
 
-    void Start ()
+    private float _startParamOffset;
+
+    private bool _isInitialized;
+
+    public void HalayInit ()
     {
+        IsHalayRunning = false;
 	    _halayorList = new List<Transform>();
-        for (int i = 0; i < InitialHalayorCount; i++)
+
+        if (InitialHalayorCount <= 2)
         {
-            GameObject go = (GameObject) Instantiate(HalayorPrefab.gameObject, Vector3.zero, Quaternion.identity, transform);
+            GameObject go = HalayorPool.GetFirst();
             _halayorList.Add(go.transform);
+            go.transform.parent = this.transform;
+            go.transform.GetComponent<Halayor>().OnHalay = true;
+
+            go = HalayorPool.GetLast();
+            _halayorList.Add(go.transform);
+            go.transform.parent = this.transform;
+            go.transform.GetComponent<Halayor>().OnHalay = true;
+        }
+        else
+        {
+            for (int i = 0; i < InitialHalayorCount; i++)
+            {
+                GameObject go;
+                if (!InitRandom)
+                    go = HalayorPool.Get();
+                else
+                {
+                    go = HalayorPool.GetRandom();
+                }
+                _halayorList.Add(go.transform);
+                go.transform.parent = this.transform;
+            }
         }
 
         _halayStartParamChangeRate = 0.1f;
         _halayMagicNumChangeRate = 0.00001f;
         _halayorDistanceChangeRate = 0.1f;
+        _startParamOffset = 0.1f;
         Time.timeScale = 1f;
 
         StartCoroutine(FirstSilence(2.5f));
+        _isInitialized = true;
     }
 
     void FixedUpdate ()
-	{
-	    if (Input.GetKeyUp(KeyCode.DownArrow))
+    {
+        if (!_isInitialized)
+            return;
+        if (IsStartPointChange)
 	    {
-	        _halayorList.RemoveAt(_halayorList.Count-1);
+	        if (HalayStartParameter > 25f)
+	        {
+	            _startParamOffset = -0.1f;
+	        }
+            else if
+	            (HalayStartParameter < 0f)
+	        {
+	            _startParamOffset = 0.1f;
+	        }
+            HalayStartParameter += _halayStartParamChangeRate * (Mathf.Sin(Time.time * 1.625f) + _startParamOffset);
 	    }
-        else if (Input.GetKeyUp(KeyCode.UpArrow))
-	    {
-	        GameObject go = (GameObject)Instantiate(HalayorPrefab.gameObject, Vector3.zero, Quaternion.identity, transform);
-	        _halayorList.Add(go.transform);
-	    }
-
-	    if(IsStartPointChange)
-            HalayStartParameter += _halayStartParamChangeRate * (Mathf.Sin(Time.time*1.625f)+0.1f);
-        if(IsCircleDistanceChange)
+	    if(IsCircleDistanceChange)
             HalayMagicNum += _halayMagicNumChangeRate * Mathf.Cos(Time.time/10f);
         if(IsHalayorDistanceChange)
 	        HalayorDistance += _halayorDistanceChangeRate * Mathf.Sin(Time.time*2);
@@ -79,12 +116,52 @@ public class SpiralGenerator : MonoBehaviour
     }
     IEnumerator LockUnlockMovementBy(float secRun, float secWait)
     {
+        IsHalayRunning = true;
         IsStartPointChange = true;
         IsCircleDistanceChange = true;
         yield return new WaitForSeconds(secRun);
+        IsHalayRunning = false;
         IsStartPointChange = false;
         IsCircleDistanceChange = false;
         yield return new WaitForSeconds(secWait);
         StartCoroutine(LockUnlockMovementBy(14.5f, 2f));
+    }
+
+    public void AddNewHalayorAt(int index, Transform halayorTransform)
+    {
+        if (index > _halayorList.Count)
+        {
+            _halayorList.Add(halayorTransform);
+        }
+        else
+        {
+            _halayorList.Insert(index, halayorTransform);
+        }
+
+        halayorTransform.parent = this.transform;
+        halayorTransform.GetComponent<Halayor>().OnHalay = true;
+    }
+
+    public int FindHalayorIndex(Transform halayor)
+    {
+        if(_halayorList.Contains(halayor))
+            return _halayorList.IndexOf(halayor);
+
+        return -1;
+    }
+
+    public int GetScore()
+    {
+        if (_halayorList.Count == HalayorPool.HalayorSize)
+        {
+            int score = 0;
+            for (int i = 0; i < _halayorList.Count; i++)
+            {
+                score += (i + 1) - Mathf.Abs(_halayorList[i].GetComponent<Halayor>().HalayorID - (i + 1));
+            }
+            return score;
+        }
+        else
+            return 0;
     }
 }
